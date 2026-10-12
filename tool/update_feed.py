@@ -43,7 +43,15 @@ def asset_record(name, size, digest, url):
     }
 
 
-def release_manifest(directory, repository, version, build_number, certificate):
+def android_application_id(value):
+    if not isinstance(value, str) or not re.fullmatch(
+        r'[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+', value
+    ):
+        raise ValueError('Invalid Android application ID')
+    return value
+
+
+def release_manifest(directory, repository, version, build_number, certificate, application_id=None):
     key = version_key(version)
     assets = []
     base = f'https://github.com/{repository}/releases/download/{quote("v" + version, safe="")}'
@@ -59,6 +67,7 @@ def release_manifest(directory, repository, version, build_number, certificate):
         'schemaVersion': 1, 'channel': 'stable' if key[3] else 'beta',
         'version': version, 'buildNumber': build_number,
         'androidCertificateSha256': certificate,
+        'androidApplicationId': android_application_id(application_id) if application_id is not None else None,
         'assets': assets,
     }
 
@@ -139,11 +148,13 @@ def pages_feed(repository, token, releases=None):
                     if asset['platform'] != 'android' or type(code) is not int or code <= 0:
                         raise ValueError('Invalid Android package version code')
                     asset['androidVersionCode'] = code
+        application_id = metadata.get('androidApplicationId') if metadata else None
         channels[channel] = {
             'version': version, 'buildNumber': metadata['buildNumber'] if metadata else None,
             'releaseUrl': release['html_url'], 'notes': release.get('body') or '',
             'publishedAt': release['published_at'],
             'androidCertificateSha256': metadata.get('androidCertificateSha256') if metadata else None,
+            'androidApplicationId': android_application_id(application_id) if application_id is not None else None,
             'assets': assets,
         }
     return {'schemaVersion': 1, 'channels': channels}
@@ -158,6 +169,7 @@ def main():
     release.add_argument('--version', required=True)
     release.add_argument('--build-number', type=int, required=True)
     release.add_argument('--certificate', required=True)
+    release.add_argument('--android-application-id')
     release.add_argument('--output', required=True)
     pages = commands.add_parser('pages')
     pages.add_argument('--repository', required=True)
@@ -165,7 +177,7 @@ def main():
     args = parser.parse_args()
     if args.command == 'release':
         data = release_manifest(args.directory, args.repository, args.version,
-                                args.build_number, args.certificate)
+                                args.build_number, args.certificate, args.android_application_id)
     else:
         data = pages_feed(args.repository, os.environ['GH_TOKEN'])
     destination = Path(args.output)
