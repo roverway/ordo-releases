@@ -134,6 +134,11 @@ def pages_feed(repository, token, releases=None):
                 original = by_name[asset['name']]
                 if asset['sha256'] != original['sha256'] or asset['size'] != original['size']:
                     raise ValueError(f'Package changed after metadata generation: {asset["name"]}')
+                if 'androidVersionCode' in original:
+                    code = original['androidVersionCode']
+                    if asset['platform'] != 'android' or type(code) is not int or code <= 0:
+                        raise ValueError('Invalid Android package version code')
+                    asset['androidVersionCode'] = code
         channels[channel] = {
             'version': version, 'buildNumber': metadata['buildNumber'] if metadata else None,
             'releaseUrl': release['html_url'], 'notes': release.get('body') or '',
