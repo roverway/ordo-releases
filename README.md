@@ -9,11 +9,15 @@
 
 正式版和 Beta 分别维护。Beta 可能含尚未稳定的功能，升级前建议备份数据。没有发布的渠道在清单中标记为 `null`。
 
+从 [1.1.0-beta.13](https://github.com/roverway/ordo-releases/releases/tag/v1.1.0-beta.13) 起，应用支持自动和手动检查正式版、Beta 两条发布线。用户确认后交由浏览器下载，安装仍由用户手动完成。
+
 ## 安装
 
 Android 下载 universal APK，按系统提示安装；Windows 下载 ZIP，退出旧版后解压运行；Linux 根据 CPU 架构选择 AppImage。安装和替换由用户确认。
 
-历史 Android Debug 签名版本无法覆盖升级到固定 Ordo 签名。请先导出数据备份，再卸载旧版、安装新版并恢复。卸载会删除本地应用数据。
+Android 新版系统包名为 `com.a40aldev.ordo`，使用固定 Ordo 签名；发行前会核验所有 APK 的包名和证书。
+
+从旧 `com.example.todo` 应用迁移时：先在旧版导出备份，安装新版（可与旧版并存），在新版导入备份并核对任务、项目、标签和提醒。重新确认通知等系统权限及必要的同步配置，数据核对完成后再卸载旧版。旧应用的数据目录不会被新版自动读取。
 
 ## 自动更新清单
 
