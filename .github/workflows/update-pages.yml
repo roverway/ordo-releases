@@ -6,6 +6,8 @@ on:
     types: [completed]
   release:
     types: [published, edited, deleted]
+  repository_dispatch:
+    types: [release-feed-updated]
   workflow_dispatch:
 
 permissions:
@@ -19,18 +21,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
-    # Install this workflow in the public distribution repository too.
-    # The private source repository must not publish authenticated download URLs.
+  request-deployment:
+    # Release-triggered deploy-pages may succeed while serving the old artifact
+    # (actions/deploy-pages#383). Dispatch against main instead of the release tag.
     if: >-
       github.event.repository.private == false &&
+      github.event_name != 'workflow_dispatch' &&
       (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Request deployment on the trusted default branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          gh api --method POST "repos/$REPOSITORY/actions/workflows/update-pages.yml/dispatches" \
+            -f ref="$DEFAULT_BRANCH"
+
+  publish:
+    # GITHUB_TOKEN workflow_dispatch is an explicit exception to recursion
+    # suppression. Only dispatch runs deploy; release/notification runs relay.
+    if: github.event.repository.private == false && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      # Use the trusted default branch, never code from the triggering run.
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.repository.default_branch }}
@@ -45,3 +65,9 @@ jobs:
           path: _site
       - uses: actions/deploy-pages@v4
         id: deployment
+      - name: Verify the actual public update URL
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          python3 tool/verify_update_feed.py --url "${PAGE_URL%/}/updates.json" \
+            --expected-file _site/updates.json --attempts 18 --interval 10
